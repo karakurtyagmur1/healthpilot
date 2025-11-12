@@ -1,0 +1,55 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "healthpilot-89733",
+          "appId": "1:436723406:android:6c1d72695d3d7227d83a9f",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "healthpilot-89733",
+          "appId": "1:436723406:ios:5be693ef93493a9fd83a9f",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "healthpilot-89733",
+          "appId": "1:436723406:ios:5be693ef93493a9fd83a9f",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "healthpilot-89733",
+          "configurations": {
+            "android": "1:436723406:android:6c1d72695d3d7227d83a9f",
+            "ios": "1:436723406:ios:5be693ef93493a9fd83a9f",
+            "macos": "1:436723406:ios:5be693ef93493a9fd83a9f",
+            "web": "1:436723406:web:edbd2324ae05ecb8d83a9f",
+            "windows": "1:436723406:web:61daebd6574fc034d83a9f"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}

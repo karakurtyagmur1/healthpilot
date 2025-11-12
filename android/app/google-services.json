@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "436723406",
+    "project_id": "healthpilot-89733",
+    "storage_bucket": "healthpilot-89733.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:436723406:android:6c1d72695d3d7227d83a9f",
+        "android_client_info": {
+          "package_name": "com.example.healthpilot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOlynsXTs2twh1sX-3Kd0gxGO1YEz2nRI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
