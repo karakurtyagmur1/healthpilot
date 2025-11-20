@@ -1,106 +1,87 @@
-// lib/services/firestore_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 
 class FirestoreService {
-  final _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// Kullanıcı profilini kaydet / güncelle
-  /// Doc: users/{uid}/profile
-  Future<void> saveUserProfile(Map<String, dynamic> data) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('Kullanıcı oturumu yok.');
-    }
+  /// Bugünün anahtarı: 2025-11-20 gibi
+  String _todayKey() {
+    final now = DateTime.now();
+    return DateFormat('yyyy-MM-dd').format(now);
+  }
+
+  /// PROFİL KAYDETME (profil ekranında kullanılıyor)
+  Future<void> saveUserProfile(String userId, Map<String, dynamic> data) async {
     await _db
         .collection('users')
-        .doc(user.uid)
-        .collection('meta')
-        .doc('profile')
+        .doc(userId)
+        .collection('profile')
+        .doc('main')
         .set(data, SetOptions(merge: true));
   }
 
-  /// Günlük öğün kaydı ekle
-  /// Doc: users/{uid}/foods/{autoId}
-  Future<void> addFoodItem({
+  /// BUGÜN İÇİN BESİN EKLE
+  Future<void> addFoodEntry({
     required String userId,
-    required String mealType, // breakfast | lunch | dinner | snack
+    required String mealType, // breakfast, lunch, dinner, snack
     required String name,
-    required int grams,
-    required int calories,
-    required int protein,
-    required int carb,
-    required int fat,
+    required double grams,
+    required double kcal,
+    required double protein,
+    required double carb,
+    required double fat,
   }) async {
-    final now = DateTime.now();
-    final ymd = DateTime(now.year, now.month, now.day); // güne göre ayrım için
-    await _db.collection('users').doc(userId).collection('foods').add({
+    final today = _todayKey();
+
+    await _db.collection('users').doc(userId).collection('food_entries').add({
+      'date': today,
       'mealType': mealType,
       'name': name,
       'grams': grams,
-      'calories': calories,
+      'kcal': kcal,
       'protein': protein,
       'carb': carb,
       'fat': fat,
       'createdAt': FieldValue.serverTimestamp(),
-      'dayKey': Timestamp.fromDate(ymd), // aynı gün filtrelemek için
     });
   }
 
-  /// Günlük öğün kaydı sil
-  Future<void> deleteFoodItem({
+  /// BUGÜN TÜM ÖĞÜNLERDEKİ BESİNLER (üstteki toplam makrolar için)
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamAllFoods(String userId) {
+    final today = _todayKey();
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('food_entries')
+        .where('date', isEqualTo: today)
+        .snapshots();
+  }
+
+  /// BUGÜN SEÇİLEN ÖĞÜNDEKİ BESİNLER (kahvaltı / öğle vs. listesi için)
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamFoodsByMeal(
+    String userId,
+    String mealType,
+  ) {
+    final today = _todayKey();
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('food_entries')
+        .where('date', isEqualTo: today)
+        .where('mealType', isEqualTo: mealType)
+        .snapshots();
+  }
+
+  /// TEK BESİN SİLME (çöp ikonuna basınca)
+  Future<void> deleteFood({
     required String userId,
     required String docId,
   }) async {
     await _db
         .collection('users')
         .doc(userId)
-        .collection('foods')
+        .collection('food_entries')
         .doc(docId)
         .delete();
-  }
-
-  /// Bugünün TÜM kayıtlarını stream eder (öğün kartlarında ekranda filtreleniyor)
-  /// Stream<QuerySnapshot> döner ki ListView ile sorunsuz kullanılabilsin.
-  Stream<QuerySnapshot<Map<String, dynamic>>> streamFoodsAll(String userId) {
-    final now = DateTime.now();
-    final ymd = DateTime(now.year, now.month, now.day);
-    return _db
-        .collection('users')
-        .doc(userId)
-        .collection('foods')
-        .where('dayKey', isEqualTo: Timestamp.fromDate(ymd))
-        .snapshots();
-  }
-
-  /// Bugünün toplamlarını hesaplar (kalori/protein/karb/yağ)
-  Stream<Map<String, num>> streamTodaySummary(String userId) {
-    final now = DateTime.now();
-    final ymd = DateTime(now.year, now.month, now.day);
-    return _db
-        .collection('users')
-        .doc(userId)
-        .collection('foods')
-        .where('dayKey', isEqualTo: Timestamp.fromDate(ymd))
-        .snapshots()
-        .map((qs) {
-      int calories = 0;
-      int protein = 0;
-      int carb = 0;
-      int fat = 0;
-      for (final d in qs.docs) {
-        final m = d.data();
-        calories += (m['calories'] ?? 0) as int;
-        protein += (m['protein'] ?? 0) as int;
-        carb += (m['carb'] ?? 0) as int;
-        fat += (m['fat'] ?? 0) as int;
-      }
-      return {
-        'calories': calories,
-        'protein': protein,
-        'carb': carb,
-        'fat': fat,
-      };
-    });
   }
 }

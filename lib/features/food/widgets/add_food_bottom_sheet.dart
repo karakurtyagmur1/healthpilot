@@ -1,66 +1,74 @@
 import 'package:flutter/material.dart';
-import 'package:healthpilot/services/firestore_service.dart';
 import 'package:healthpilot/data/foods.dart';
+import 'package:healthpilot/services/firestore_service.dart';
 
 class AddFoodBottomSheet extends StatefulWidget {
+  final String mealType; // breakfast, lunch, dinner, snack
   final String userId;
-  final String mealType; // breakfast | lunch | dinner | snack
-  const AddFoodBottomSheet(
-      {super.key, required this.userId, required this.mealType});
+
+  const AddFoodBottomSheet({
+    super.key,
+    required this.mealType,
+    required this.userId,
+  });
 
   @override
   State<AddFoodBottomSheet> createState() => _AddFoodBottomSheetState();
 }
 
 class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
-  final TextEditingController _searchCtrl = TextEditingController();
-  final TextEditingController _gramsCtrl = TextEditingController(text: '100');
+  final _searchCtrl = TextEditingController();
+  final _gramsCtrl = TextEditingController(text: '100');
+  final _fs = FirestoreService();
 
-  List<FoodItem> _results = foods; // başlangıçta tüm liste
+  List<FoodItem> _results = foods;
   FoodItem? _selected;
 
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(_onSearch);
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    _gramsCtrl.dispose();
-    super.dispose();
-  }
-
-  void _onSearch() {
-    final q = _searchCtrl.text.trim().toLowerCase();
-    if (q.isEmpty) {
-      setState(() => _results = foods);
-      return;
+    if (foods.isNotEmpty) {
+      _selected = foods.first;
     }
+  }
+
+  void _onSearchChanged(String value) {
+    final q = value.toLowerCase();
     setState(() {
-      _results = foods.where((f) {
-        final n = f.name.toLowerCase();
-        final alts = f.altNames.map((e) => e.toLowerCase());
-        return n.contains(q) || alts.any((a) => a.contains(q));
-      }).toList();
+      _results = foods
+          .where((f) => f.name.toLowerCase().contains(q))
+          .toList(growable: false);
+      if (_results.isNotEmpty) {
+        _selected = _results.first;
+      } else {
+        _selected = null;
+      }
     });
   }
 
   Future<void> _addSelected() async {
     if (_selected == null) return;
-    final grams = int.tryParse(_gramsCtrl.text) ?? 100;
-    final factor = grams / 100.0;
 
-    await FirestoreService().addFoodItem(
+    final gramsText = _gramsCtrl.text.replaceAll(',', '.');
+    final grams = double.tryParse(gramsText) ?? 0;
+    if (grams <= 0) return;
+
+    final factor = grams / _selected!.baseGrams;
+
+    final kcal = _selected!.kcal * factor;
+    final protein = _selected!.protein * factor;
+    final carb = _selected!.carb * factor;
+    final fat = _selected!.fat * factor;
+
+    await _fs.addFoodEntry(
       userId: widget.userId,
       mealType: widget.mealType,
       name: _selected!.name,
       grams: grams,
-      calories: (_selected!.calories * factor).round(),
-      protein: (_selected!.protein * factor).round(),
-      carb: (_selected!.carb * factor).round(),
-      fat: (_selected!.fat * factor).round(),
+      kcal: kcal,
+      protein: protein,
+      carb: carb,
+      fat: fat,
     );
 
     if (mounted) Navigator.pop(context);
@@ -68,67 +76,89 @@ class _AddFoodBottomSheetState extends State<AddFoodBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Besin Ekle',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _searchCtrl,
-              decoration: const InputDecoration(
-                hintText: 'Besin ara (örn: tavuk, yumurta...)',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 180,
-              child: ListView.builder(
-                itemCount: _results.length,
-                itemBuilder: (context, index) {
-                  final item = _results[index];
-                  final selected = item == _selected;
-                  return ListTile(
-                    title: Text(item.name),
-                    subtitle: Text(
-                        '100 g: ${item.calories} kcal • P:${item.protein}g K:${item.carb}g Y:${item.fat}g'),
-                    trailing: selected
-                        ? const Icon(Icons.check_circle, color: Colors.green)
-                        : null,
-                    onTap: () => setState(() => _selected = item),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Text('Gram:'),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _gramsCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      hintText: '100',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton(
+              ),
+              TextField(
+                controller: _searchCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Besin ara',
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: _onSearchChanged,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _gramsCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Miktar (gram)',
+                  suffixText: 'g',
+                ),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 16),
+              if (_results.isNotEmpty)
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _results.length,
+                  itemBuilder: (context, index) {
+                    final item = _results[index];
+                    return ListTile(
+                      title: Text(item.name),
+                      subtitle: Text(
+                        '${item.baseGrams.toStringAsFixed(0)} g için: '
+                        '${item.kcal.toStringAsFixed(0)} kcal • '
+                        'P:${item.protein.toStringAsFixed(1)}g '
+                        'K:${item.carb.toStringAsFixed(1)}g '
+                        'Y:${item.fat.toStringAsFixed(1)}g',
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      onTap: () {
+                        setState(() {
+                          _selected = item;
+                          _searchCtrl.text = item.name;
+                        });
+                      },
+                      selected: _selected == item,
+                    );
+                  },
+                )
+              else
+                const Text(
+                  'Sonuç bulunamadı',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
                   onPressed: _addSelected,
                   child: const Text('Ekle'),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
