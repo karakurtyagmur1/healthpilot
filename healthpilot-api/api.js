@@ -8,8 +8,10 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Test endpoint
 app.get("/", (req, res) => {
-  res.send("OK");
+  res.send("HealthPilot API OK");
 });
 
 const client = new OpenAI({
@@ -21,41 +23,30 @@ app.post("/chat", async (req, res) => {
   try {
     const { message, context } = req.body;
 
-    // Context güvenli alım
     const targets = context?.targets || {};
     const totals = context?.totals || {};
     const remaining = context?.remaining || {};
 
     const systemPrompt = `
 Sen HealthPilot isimli akıllı bir beslenme asistanısın.
+Türkçe konuş, kısa ve net cevap ver.
 
-Kurallar:
-- Türkçe konuş
-- Kısa, net ve insansı cevaplar ver
-- Robot gibi tekrar etme
-- Kullanıcının sorusuna odaklan
-- Sayıları küsüratsız yaz
-- Gereksiz uzun açıklama yapma
+Bugün:
+Hedef Kalori: ${Math.round(targets.kcal || 0)}
+Alınan Kalori: ${Math.round(totals.kcal || 0)}
+Kalan Kalori: ${Math.round(remaining.kcal || 0)}
 
-Bugünkü durum:
-- Hedef Kalori: ${Math.round(targets.kcal || 0)} kcal
-- Alınan Kalori: ${Math.round(totals.kcal || 0)} kcal
-- Kalan Kalori: ${Math.round(remaining.kcal || 0)} kcal
+Hedef Protein: ${Math.round(targets.protein || 0)}
+Alınan Protein: ${Math.round(totals.protein || 0)}
+Kalan Protein: ${Math.round(remaining.protein || 0)}
 
-- Hedef Protein: ${Math.round(targets.protein || 0)} g
-- Alınan Protein: ${Math.round(totals.protein || 0)} g
-- Kalan Protein: ${Math.round(remaining.protein || 0)} g
+Hedef Karbonhidrat: ${Math.round(targets.carb || 0)}
+Alınan Karbonhidrat: ${Math.round(totals.carb || 0)}
+Kalan Karbonhidrat: ${Math.round(remaining.carb || 0)}
 
-- Hedef Karbonhidrat: ${Math.round(targets.carb || 0)} g
-- Alınan Karbonhidrat: ${Math.round(totals.carb || 0)} g
-- Kalan Karbonhidrat: ${Math.round(remaining.carb || 0)} g
-
-- Hedef Yağ: ${Math.round(targets.fat || 0)} g
-- Alınan Yağ: ${Math.round(totals.fat || 0)} g
-- Kalan Yağ: ${Math.round(remaining.fat || 0)} g
-
-Örnek cevap tarzı:
-"Bugün 720 kcal hakkın kaldı. Protein biraz düşük, akşam yemeğinde protein ağırlıklı bir seçim iyi olur."
+Hedef Yağ: ${Math.round(targets.fat || 0)}
+Alınan Yağ: ${Math.round(totals.fat || 0)}
+Kalan Yağ: ${Math.round(remaining.fat || 0)}
 `;
 
     const response = await client.chat.completions.create({
@@ -78,6 +69,7 @@ Bugünkü durum:
 
 // ---------- SERVER ----------
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
   console.log(⁠ ✅ HealthPilot API çalışıyor. Port: ${PORT} ⁠);
 });
