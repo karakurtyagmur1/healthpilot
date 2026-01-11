@@ -33,7 +33,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // - Chrome/macOS: localhost genelde OK
   // - Android emülatör: http://10.0.2.2:3000/chat
   // - iOS simülatör: localhost genelde OK
-  final String _endpoint = 'http://localhost:3000/chat';
+  final String _endpoint = 'https://healthpilot-api.onrender.com/';
 
   @override
   void initState() {

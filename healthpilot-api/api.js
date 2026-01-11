@@ -8,6 +8,9 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.get("/", (req, res) => {
+  res.send("OK");
+});
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -76,5 +79,5 @@ Bugünkü durum:
 // ---------- SERVER ----------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ HealthPilot API çalışıyor → http://localhost:${PORT}`);
+  console.log(⁠ ✅ HealthPilot API çalışıyor. Port: ${PORT} ⁠);
 });
