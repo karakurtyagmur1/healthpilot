@@ -2,28 +2,66 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class FirestoreService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  FirestoreService({FirebaseFirestore? db})
+      : _db = db ?? FirebaseFirestore.instance;
 
-  /// Bugünün anahtarı: 2025-11-20 gibi
-  String _todayKey() {
-    final now = DateTime.now();
-    return DateFormat('yyyy-MM-dd').format(now);
+  final FirebaseFirestore _db;
+
+  // ----------------------------
+  // Utils
+  // ----------------------------
+  String dateKey(DateTime dt) => DateFormat('yyyy-MM-dd').format(dt);
+
+  DocumentReference<Map<String, dynamic>> _profileDoc(String userId) =>
+      _db.collection('users').doc(userId).collection('profile').doc('main');
+
+  CollectionReference<Map<String, dynamic>> _foodCol(String userId) =>
+      _db.collection('users').doc(userId).collection('food_entries');
+
+  // ----------------------------
+  // PROFILE
+  // ----------------------------
+  Future<void> saveUserProfile(
+    String userId,
+    Map<String, dynamic> profileData, {
+    Map<String, dynamic>? macroPlan,
+  }) async {
+    final payload = <String, dynamic>{
+      ...profileData,
+      if (macroPlan != null) 'macroPlan': macroPlan,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    await _profileDoc(userId).set(payload, SetOptions(merge: true));
   }
 
-  /// PROFİL KAYDETME (profil ekranında kullanılıyor)
-  Future<void> saveUserProfile(String userId, Map<String, dynamic> data) async {
-    await _db
-        .collection('users')
-        .doc(userId)
-        .collection('profile')
-        .doc('main')
-        .set(data, SetOptions(merge: true));
+  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    final doc = await _profileDoc(userId).get();
+    return doc.data();
   }
 
-  /// BUGÜN İÇİN BESİN EKLE
-  Future<void> addFoodEntry({
+  Stream<Map<String, dynamic>?> streamUserProfile(String userId) {
+    return _profileDoc(userId).snapshots().map((snap) => snap.data());
+  }
+
+  Future<Map<String, dynamic>?> getMacroPlan(String userId) async {
+    final data = await getUserProfile(userId);
+    return data?['macroPlan'] as Map<String, dynamic>?;
+  }
+
+  Stream<Map<String, dynamic>?> streamMacroPlan(String userId) {
+    return _profileDoc(userId)
+        .snapshots()
+        .map((snap) => (snap.data()?['macroPlan'] as Map<String, dynamic>?));
+  }
+
+  // ----------------------------
+  // FOOD ENTRIES
+  // ----------------------------
+  Future<String> addFoodEntry({
     required String userId,
-    required String mealType, // breakfast, lunch, dinner, snack
+    required String dateKey,
+    required String mealType,
     required String name,
     required double grams,
     required double kcal,
@@ -31,57 +69,102 @@ class FirestoreService {
     required double carb,
     required double fat,
   }) async {
-    final today = _todayKey();
-
-    await _db.collection('users').doc(userId).collection('food_entries').add({
-      'date': today,
+    final doc = await _foodCol(userId).add({
+      'date': dateKey,
       'mealType': mealType,
-      'name': name,
+      'name': name.trim(),
       'grams': grams,
       'kcal': kcal,
       'protein': protein,
       'carb': carb,
       'fat': fat,
       'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return doc.id;
+  }
+
+  Future<void> updateFoodEntry({
+    required String userId,
+    required String docId,
+    Map<String, dynamic>? patch,
+  }) async {
+    if (patch == null || patch.isEmpty) return;
+    await _foodCol(userId).doc(docId).update({
+      ...patch,
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
-  /// BUGÜN TÜM ÖĞÜNLERDEKİ BESİNLER (üstteki toplam makrolar için)
-  Stream<QuerySnapshot<Map<String, dynamic>>> streamAllFoods(String userId) {
-    final today = _todayKey();
-    return _db
-        .collection('users')
-        .doc(userId)
-        .collection('food_entries')
-        .where('date', isEqualTo: today)
-        .snapshots();
+  Future<void> deleteFoodEntry({
+    required String userId,
+    required String docId,
+  }) async {
+    await _foodCol(userId).doc(docId).delete();
   }
 
-  /// BUGÜN SEÇİLEN ÖĞÜNDEKİ BESİNLER (kahvaltı / öğle vs. listesi için)
-  Stream<QuerySnapshot<Map<String, dynamic>>> streamFoodsByMeal(
+  Future<List<Map<String, dynamic>>> fetchFoodsByDate({
+    required String userId,
+    required String dateKey,
+  }) async {
+    final snap = await _foodCol(userId).where('date', isEqualTo: dateKey).get();
+    return snap.docs
+        .map((d) => {
+              ...d.data(),
+              'id': d.id,
+            })
+        .toList(growable: false);
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamFoodsByDate(
+    String userId, {
+    required String dateKey,
+  }) {
+    return _foodCol(userId).where('date', isEqualTo: dateKey).snapshots();
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamFoodsByMealAndDate(
     String userId,
-    String mealType,
-  ) {
-    final today = _todayKey();
-    return _db
-        .collection('users')
-        .doc(userId)
-        .collection('food_entries')
-        .where('date', isEqualTo: today)
+    String mealType, {
+    required String dateKey,
+  }) {
+    return _foodCol(userId)
+        .where('date', isEqualTo: dateKey)
         .where('mealType', isEqualTo: mealType)
         .snapshots();
   }
 
-  /// TEK BESİN SİLME (çöp ikonuna basınca)
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamFoodsInDateRange(
+    String userId, {
+    required String startDateKey,
+    required String endDateKey,
+  }) {
+    return _foodCol(userId)
+        .where('date', isGreaterThanOrEqualTo: startDateKey)
+        .where('date', isLessThanOrEqualTo: endDateKey)
+        .snapshots();
+  }
+
+  // ----------------------------
+  // BACKWARD COMPAT (ALIAS)
+  // Dashboard/Chat eski çağrıları kırmasın
+  // ----------------------------
+
   Future<void> deleteFood({
     required String userId,
     required String docId,
-  }) async {
-    await _db
-        .collection('users')
-        .doc(userId)
-        .collection('food_entries')
-        .doc(docId)
-        .delete();
-  }
+  }) =>
+      deleteFoodEntry(userId: userId, docId: docId);
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamAllFoodsByDate(
+    String userId, {
+    required String dateKey,
+  }) =>
+      streamFoodsByDate(userId, dateKey: dateKey);
+
+  Future<List<Map<String, dynamic>>> fetchAllFoodsByDate({
+    required String userId,
+    required String dateKey,
+  }) =>
+      fetchFoodsByDate(userId: userId, dateKey: dateKey);
 }
