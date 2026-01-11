@@ -71,5 +71,5 @@ Kalan Yağ: ${Math.round(remaining.fat || 0)}
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(⁠ ✅ HealthPilot API çalışıyor. Port: ${PORT} ⁠);
+  console.log("HealthPilot API çalışıyor. Port: " + PORT);
 });
